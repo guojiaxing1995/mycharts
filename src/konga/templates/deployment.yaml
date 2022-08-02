@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: konga-deployment
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: konga
+  template:
+    metadata:
+      labels:
+        app: konga
+    spec:
+      {{- if .Values.nodeSelector }}
+      nodeSelector: {{ include "konga.tplValue" (dict "value" .Values.nodeSelector "context" $) | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: konga
+        image: {{ .Values.image.repository }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 1337
+          initialDelaySeconds: 30                            
+          periodSeconds: 20                                   
+          timeoutSeconds: 5                                   
+          successThreshold: 1                                 
+          failureThreshold: 3                                 
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 1337                                       
+          initialDelaySeconds: 30                             
+          periodSeconds: 20                                  
+          timeoutSeconds: 5                                  
+          successThreshold: 1                                 
+          failureThreshold: 3                                 
+        ports:
+        - containerPort: 1337
+        env:
+        - name: TOKEN_SECRET
+          value: "localhost"
+        - name: NODE_ENV
+          value: "development"
+        - name: DB_ADAPTER
+          value: "postgres"
+        - name: DB_HOST
+          value: {{ .Values.postgresql.DB_HOST }}
+        - name: DB_USER
+          value: {{ .Values.postgresql.DB_USER }}
+        - name: DB_PASSWORD
+          value: {{ .Values.postgresql.DB_PASSWORD }}
+        - name: DB_DATABASE
+          value: {{ .Values.postgresql.DB_DATABASE }}
+        volumeMounts:
+        - name: konga-localtime
+          mountPath: /etc/localtime
+      volumes:
+      - name: konga-localtime
+        hostPath:
+          path: /etc/localtime

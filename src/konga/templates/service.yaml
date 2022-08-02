@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: kongasvc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    name: kongasvc
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    # 服务访问端口
+  - port: 1337   
+    protocol: TCP
+    # 容器端口
+    targetPort: 1337
+    {{- if .Values.service.nodePort }}
+    nodePort: {{ .Values.service.nodePort }}
+    {{- end }}
+  selector:
+    app: konga
