@@ -1,0 +1,28 @@
+{{- if .Values.hpa.enabled -}}
+apiVersion: autoscaling/v2beta2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: kong-hpa
+  namespace: {{ .Release.Namespace }}
+spec:
+    maxReplicas: 10
+    minReplicas: 1
+    scaleTargetRef:
+      apiVersion: apps/v1
+      kind: Deployment
+      name: kong
+    metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: AverageValue
+          averageValue: 800m
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: AverageValue
+          averageValue: 1Gi
+{{- end }}
+

@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kong
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: kong
+  template:
+    metadata:
+      labels:
+        app: kong
+    spec:
+      {{- if .Values.nodeSelector }}
+      nodeSelector: {{ include "kong.tplValue" (dict "value" .Values.nodeSelector "context" $) | nindent 8 }}
+      {{- end }}
+      initContainers:
+      - name: kong-init
+        image: {{ .Values.image.repository }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        args: ["kong", "migrations", "bootstrap"]
+        env:
+        - name: KONG_DATABASE
+          value: "postgres"
+        - name: KONG_PG_HOST
+          value: {{ .Values.postgresql.DB_HOST }}
+        - name: KONG_PG_USER
+          value: {{ .Values.postgresql.DB_USER }}
+        - name: KONG_PG_PASSWORD
+          value: {{ .Values.postgresql.DB_PASSWORD }}
+        volumeMounts:
+        - name: kong-localtime
+          mountPath: /etc/localtime
+      containers:
+      - name: kong
+        image: {{ .Values.image.repository }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "500Mi"
+          limits:
+            cpu: "1000m"
+            memory: "2Gi"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8001
+          initialDelaySeconds: 30                            
+          periodSeconds: 20                                   
+          timeoutSeconds: 5                                   
+          successThreshold: 1                                 
+          failureThreshold: 3                                 
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8001                                       
+          initialDelaySeconds: 30                             
+          periodSeconds: 20                                  
+          timeoutSeconds: 5                                  
+          successThreshold: 1                                 
+          failureThreshold: 3                                 
+        ports:
+        - containerPort: 8001
+        - containerPort: 8000
+        env:
+        - name: KONG_DATABASE
+          value: "postgres"
+        - name: KONG_PG_HOST
+          value: {{ .Values.postgresql.DB_HOST }}
+        - name: KONG_PG_USER
+          value: {{ .Values.postgresql.DB_USER }}
+        - name: KONG_PG_PASSWORD
+          value: {{ .Values.postgresql.DB_PASSWORD }}
+        - name: KONG_ADMIN_LISTEN
+          value: "0.0.0.0:8001, 0.0.0.0:8444 ssl"
+        - name: KONG_UNTRUSTED_LUA_SANDBOX_REQUIRES
+          value: "cjson,socket.url,resty.http"
+        - name: KONG_REAL_IP_RECURSIVE
+          value: "on"
+        - name: KONG_TRUSTED_IPS
+          value: "0.0.0.0/0,::/0"
+        - name: KONG_REAL_IP_HEADER
+          value: "X-Forwarded-For"
+        volumeMounts:
+        - name: kong-localtime
+          mountPath: /etc/localtime
+      volumes:
+      - name: kong-localtime
+        hostPath:
+          path: /etc/localtime
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                 - key: app
+                   operator: In
+                   values:
+                   - kong
+              topologyKey: kubernetes.io/hostname
